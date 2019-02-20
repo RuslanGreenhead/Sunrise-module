@@ -1,0 +1,44 @@
+#include <Wire.h> 
+#include <ESP8266WiFi.h>                    //Подключение библиотек
+ 
+const char* ssid = "**********";            //ssid локальной Wi-Fi сети объекта 
+const char* password = "********";          //Пароль доступа к локальной сети
+String sending_data = "";
+ 
+WiFiServer server(80);                                 
+ 
+void setup() {
+  Wire.begin(8);                            //Инициализация устройства как ведомого
+  Wire.onReceive(receiveEvent);            
+  delay(10);
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {   //Ожидание подключения модуля к Wi-Fi сети
+    delay(500);
+  }
+  server.begin();                           //Запуск локального веб-сервера
+  Serial.println(WiFi.localIP());           //Вывод IP адреса сервера в серийный порт
+}
+
+void loop() {
+  WiFiClient client = server.available();   //Проверка подключения
+  if (!client) {
+    return;
+  }
+  while(!client.available()){
+    delay(1);
+  }
+  
+  client.flush();
+  client.println(sending_data);             //Вывод данных на веб-сервер
+  delay(1000);
+}
+
+void receiveEvent(int howMany) {            //Функция обработки приема данных от ведущего устр-ва
+   String data = "";
+   while (0 <Wire.available()) {
+     char c = Wire.read();      
+     data += c;           
+  }
+   sending_data = data;                   //Формирование строки для отправки на сервер
+}
