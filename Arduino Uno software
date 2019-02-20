@@ -1,0 +1,76 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>                 //Подключение библиотек
+#include <iarduino_RTC.h>                               
+iarduino_RTC time(RTC_DS1302,7,5,6);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+void setup()
+{
+  pinMode(8, OUTPUT);
+  pinMode(9, OUTPUT);
+  delay(300);                                                                
+  time.begin();
+  Wire.begin();
+  lcd.init();                     
+  lcd.backlight();
+}
+
+void transmission(char* info){                 //Функция передачи данных на NodeMCU
+        Wire.beginTransmission(8); 
+        Wire.write(info);  
+        Wire.endTransmission(); 
+        delay(1000); 
+}
+
+void loop()
+{
+      byte battery[8] = {           
+   B01110,
+   B11111,
+   B11111,
+   B11111,
+   B11111,
+   B11111,
+   B11111
+  };
+      lcd.createChar(1, battery);              //Создание символа батарейки для LCD-дисплея
+
+      float R1 = 2000.0;                       //Определение сопротивления резисторов делителя напряжения
+      float R2 = 1000.0;
+      int pin_read = A3;
+      float Vbat = ((analogRead(pin_read) * 5.0) / 1024.0) * 0.905;
+      float Vin = Vbat / (R2/(R1 + R2)); //Рассчёт напряжения АКБ 
+
+      int charge = ((Vin - 11.6) / 1.1) * 100; //Определение уровня заряда АКБ в процентах
+      lcd.setCursor(0,0);
+      if(charge >= 0) {                        //Вывод индикатора уровня заряда АКБ на LCD-дисплей
+         lcd.write(1);
+         if (charge >= 33) {
+            lcd.setCursor(1,0);
+            lcd.write(1);
+            if (charge >= 66) {
+               lcd.setCursor(2,0);
+               lcd.write(1);
+            }
+         }
+      }
+      
+      lcd.setCursor(0, 1);
+      lcd.print(time.gettime("H:i"));          //Вывод реального времени на LCD-дисплей
+      if (time.Hours == 23 or time.Hours <= 7 or charge < 15) {
+        digitalWrite(8, LOW);                  //Переключение фазовых проводов
+        digitalWrite(9, LOW);
+        transmission("CITY");                  //Передача данных на NodeMCU 
+        lcd.setCursor(12, 1);
+        lcd.print("CITY");                              
+      }
+      else {
+        digitalWrite(8, HIGH);                 //Переключение фазовых проводов
+        digitalWrite(9, HIGH);
+        transmission("HOME");                  //Передача данных на NodeMCU
+        lcd.setCursor(12, 1);
+        lcd.print("HOME");   
+      }
+     transmission(time.gettime("H:i"));        //Передача данных на NodeMCU
+     transmission(charge);                     //Передача данных на NodeMCU
+}
